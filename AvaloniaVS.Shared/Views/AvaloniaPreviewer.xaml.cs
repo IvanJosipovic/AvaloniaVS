@@ -158,7 +158,7 @@ namespace AvaloniaVS.Views
             {
                 var scaling = VisualTreeHelper.GetDpi(this).DpiScaleX;
 
-                // If an error in the Xaml is present, we get a bitmap with width/height = 1
+                // If an error is present, we get a bitmap with width/height = 1
                 // Which isn't ideal, but also messes up the scroll location since it will
                 // trigger it to re-center, so only change the size
                 // if the process shows we don't have an error

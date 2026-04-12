@@ -2,7 +2,7 @@
     "$schema": "http://json.schemastore.org/vsix-publish",
     "categories": [ "build", "coding" ],
     "identity": {
-        "internalName": "AvaloniaVS"
+        "internalName": "AvaloniaDeclarativePreview"
     },
     "overview": "overview.md",
     "publisher": "AvaloniaTeam",

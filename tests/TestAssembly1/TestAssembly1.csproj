@@ -2,19 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <RootNamespace>CompletionEngineTests.Models</RootNamespace>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\CompletionEngineTests\Models.cs" Link="Models.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <InternalsVisibleTo Include="CompletionEngineTests" />
   </ItemGroup>
 </Project>

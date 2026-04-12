@@ -1,0 +1,10 @@
+{
+  "inputs": [],
+  "servers": {
+    "Avalonia Docs": {
+      "type": "http",
+      "url": "https://docs-mcp.avaloniaui.net/mcp",
+      "headers": {}
+    }
+  }
+}

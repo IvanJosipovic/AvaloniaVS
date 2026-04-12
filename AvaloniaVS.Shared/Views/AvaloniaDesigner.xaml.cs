@@ -4,15 +4,13 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Avalonia.Ide.CompletionEngine;
-using Avalonia.Ide.CompletionEngine.AssemblyMetadata;
-using Avalonia.Ide.CompletionEngine.DnlibMetadataProvider;
 using AvaloniaVS.Models;
 using AvaloniaVS.Services;
 using AvaloniaVS.Shared.Services;
@@ -20,8 +18,6 @@ using EnvDTE;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.VisualStudio.Text;
-using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Threading;
 using Serilog;
 using VSLangProj;
@@ -29,15 +25,8 @@ using Task = System.Threading.Tasks.Task;
 
 namespace AvaloniaVS.Views
 {
-    public enum AvaloniaDesignerView
-    {
-        Split,
-        Design,
-        Source,
-    }
-
     /// <summary>
-    /// The Avalonia XAML designer control.
+    /// The Avalonia previewer control.
     /// </summary>
     internal partial class AvaloniaDesigner : UserControl, IDisposable
     {
@@ -55,20 +44,6 @@ namespace AvaloniaVS.Views
                 typeof(AvaloniaDesigner),
                 new PropertyMetadata(HandleSelectedTargetChanged));
 
-        public static readonly DependencyProperty SplitOrientationProperty =
-            DependencyProperty.Register(
-                nameof(SplitOrientation),
-                typeof(Orientation),
-                typeof(AvaloniaDesigner),
-                new PropertyMetadata(Orientation.Horizontal, HandleSplitOrientationChanged));
-
-        public static readonly DependencyProperty ViewProperty =
-            DependencyProperty.Register(
-                nameof(View),
-                typeof(AvaloniaDesignerView),
-                typeof(AvaloniaDesigner),
-                new PropertyMetadata(AvaloniaDesignerView.Split, HandleViewChanged));
-
         public static readonly DependencyProperty TargetsProperty =
             TargetsPropertyKey.DependencyProperty;
 
@@ -84,21 +59,16 @@ namespace AvaloniaVS.Views
         public static string[] ZoomLevels { get; } = AvaloniaVS.ZoomLevels.Levels;
 
 
-        private static readonly GridLength ZeroStar = new GridLength(0, GridUnitType.Star);
         private static readonly GridLength OneStar = new GridLength(1, GridUnitType.Star);
         private readonly Throttle<string> _throttle;
-        private readonly ColumnDefinition _previewCol = new ColumnDefinition { Width = OneStar };
-        private readonly ColumnDefinition _codeCol = new ColumnDefinition { Width = OneStar };
         private Project _project;
-        private IWpfTextViewHost _editor;
-        private string _xamlPath;
+        private string _currentFileName;
         private bool _loadingTargets;
         private bool _isStarted;
         private bool _isPaused;
         private SemaphoreSlim _startingProcess = new SemaphoreSlim(1, 1);
         private bool _disposed;
         private double _scaling = 1;
-        private AvaloniaDesignerView _unPausedView;
         private bool _buildRequired;
         private bool _firstFrame = true;
         private readonly Throttle<double> _previewResizethrottle;
@@ -110,7 +80,7 @@ namespace AvaloniaVS.Views
         {
             InitializeComponent();
 
-            _throttle = new Throttle<string>(TimeSpan.FromMilliseconds(300), UpdateXaml);
+            _throttle = new Throttle<string>(TimeSpan.FromMilliseconds(300), _ => { });
             _previewResizethrottle = new(TimeSpan.FromMilliseconds(500), UpdateScaling);
             Process = new PreviewerProcess();
             Process.ErrorChanged += ErrorChanged;
@@ -118,7 +88,6 @@ namespace AvaloniaVS.Views
             Process.ProcessExited += ProcessExited;
             previewer.Process = Process;
             pausedMessage.Visibility = Visibility.Collapsed;
-            UpdateLayoutForView();
 
             Loaded += (s, e) =>
             {
@@ -141,17 +110,6 @@ namespace AvaloniaVS.Views
                     _isPaused = value;
                     StartStopProcessAsync().FireAndForget();
 
-                    if (value)
-                    {
-                        _unPausedView = View;
-                        // Hide the designer and only show the xaml source when debugging
-                        // This matches UWP/WPF's designer
-                        View = AvaloniaDesignerView.Source;
-                    }
-                    else
-                    {
-                        View = _unPausedView;
-                    }
                 }
             }
         }
@@ -162,7 +120,7 @@ namespace AvaloniaVS.Views
         public PreviewerProcess Process { get; }
 
         /// <summary>
-        /// Gets the list of targets that the designer can use to preview the XAML.
+        /// Gets the list of targets that the previewer can use.
         /// </summary>
         public IReadOnlyList<DesignerRunTarget> Targets
         {
@@ -180,77 +138,6 @@ namespace AvaloniaVS.Views
         }
 
         /// <summary>
-        /// Gets or sets the orientation of the split view.
-        /// </summary>
-        public Orientation SplitOrientation
-        {
-            get => (Orientation)GetValue(SplitOrientationProperty);
-            set => SetValue(SplitOrientationProperty, value);
-        }
-
-        /// <summary>
-        /// Gets or sets whether the split view panes are swapped.
-        /// </summary>
-        public bool PreviewAndXamlPanesSwapped
-        {
-            get => SplitOrientation switch
-            {
-                Orientation.Horizontal => Grid.GetRow(editorHost) != 0,
-                Orientation.Vertical => Grid.GetColumn(editorHost) != 0,
-                _ => throw new NotSupportedException(),
-            };
-
-            set
-            {
-                if (value == PreviewAndXamlPanesSwapped)
-                {
-                    return;
-                }
-
-                switch (SplitOrientation)
-                {
-                    case Orientation.Horizontal:
-                        if (value)
-                        {
-                            Grid.SetRow(editorHost, 2);
-                            Grid.SetRow(previewer, 0);
-                        }
-                        else
-                        {
-                            Grid.SetRow(editorHost, 0);
-                            Grid.SetRow(previewer, 2);
-                        }
-                        break;
-
-                    case Orientation.Vertical:
-                        if (value)
-                        {
-                            Grid.SetColumn(editorHost, 2);
-                            Grid.SetColumn(previewer, 0);
-                        }
-                        else
-                        {
-                            Grid.SetColumn(editorHost, 0);
-                            Grid.SetColumn(previewer, 2);
-                        }
-                        break;
-
-                    default:
-                        throw new NotSupportedException();
-                }
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets the type of view to display.
-        /// </summary>
-        public AvaloniaDesignerView View
-        {
-            get => (AvaloniaDesignerView)GetValue(ViewProperty);
-            set => SetValue(ViewProperty, value);
-        }
-
-        /// <summary>
         /// Gets or sets the zoom level as a string.
         /// </summary>
         public string ZoomLevel
@@ -259,22 +146,12 @@ namespace AvaloniaVS.Views
             set => SetValue(ZoomLevelProperty, value);
         }
 
-        protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
-        {
-            if (e.Property == SelectedTargetProperty)
-            {
-                previewer.SelectedProject = SelectedTarget.Project;
-            }
-            base.OnPropertyChanged(e);
-        }
-
         /// <summary>
-        /// Starts the designer.
+        /// Starts the previewer.
         /// </summary>
-        /// <param name="project">The project containing the XAML file.</param>
-        /// <param name="xamlPath">The path to the XAML file.</param>
-        /// <param name="editor">The VS text editor control host.</param>
-        public void Start(Project project, string xamlPath, IWpfTextViewHost editor)
+        /// <param name="project">The project containing the preview target.</param>
+        /// <param name="fileName">The active C# file used to infer the root view type.</param>
+        public void Start(Project project, string fileName)
         {
             Log.Logger.Verbose("Started AvaloniaDesigner.Start()");
 
@@ -284,32 +161,10 @@ namespace AvaloniaVS.Views
             }
 
             _project = project ?? throw new ArgumentNullException(nameof(project));
-            _xamlPath = xamlPath ?? throw new ArgumentNullException(nameof(xamlPath));
-            _editor = editor ?? throw new ArgumentNullException(nameof(editor));
-
-            InitializeEditor();
+            _currentFileName = fileName;
             LoadTargetsAndStartProcessAsync().FireAndForget();
 
             Log.Logger.Verbose("Finished AvaloniaDesigner.Start()");
-        }
-
-        /// <summary>
-        /// Invalidates the intellisense completion metadata.
-        /// </summary>
-        /// <remarks>
-        /// Should be called when the designer is paused; when unpaused the completion metadata
-        /// will be updated.
-        /// </remarks>
-        public void InvalidateCompletionMetadata()
-        {
-            var buffer = _editor.TextView.TextBuffer;
-
-            if (buffer.Properties.TryGetProperty<XamlBufferMetadata>(
-                    typeof(XamlBufferMetadata),
-                    out var metadata))
-            {
-                metadata.NeedInvalidation = true;
-            }
         }
 
         /// <summary>
@@ -319,17 +174,9 @@ namespace AvaloniaVS.Views
         {
             _disposed = true;
 
-            if (_editor?.TextView.TextBuffer is ITextBuffer2 oldBuffer)
-            {
-                oldBuffer.ChangedOnBackground -= TextChanged;
-            }
-
-            if (_editor?.IsClosed == false)
-            {
-                _editor.Close();
-            }
-
             Process.FrameReceived -= FrameReceived;
+            Process.ErrorChanged -= ErrorChanged;
+            Process.ProcessExited -= ProcessExited;
 
             _throttle.Dispose();
             previewer.Dispose();
@@ -339,34 +186,6 @@ namespace AvaloniaVS.Views
         protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
         {
             Process.SetScalingAsync(newDpi.DpiScaleX * _scaling).FireAndForget();
-        }
-
-        private void InitializeEditor()
-        {
-            // The HostControl for the IWpfTextViewHost comes parented to two borders,
-            // find the root and use that for insertion into our designer pane.
-            // The old code unparented the WPF control from the inner border, which is fine,
-            // but this feels safer incase anything changes in the future
-            var content = _editor.HostControl as FrameworkElement;
-            var parent = VisualTreeHelper.GetParent(content);
-            while (parent != null)
-            {
-                content = parent as FrameworkElement;
-                parent = VisualTreeHelper.GetParent(content);
-            }
-
-            editorHost.Child = content;
-
-            _editor.TextView.TextBuffer.Properties.RemoveProperty(typeof(PreviewerProcess));
-            _editor.TextView.TextBuffer.Properties.AddProperty(typeof(PreviewerProcess), Process);
-
-            _editor.TextView.Properties.RemoveProperty(typeof(AvaloniaDesigner));
-            _editor.TextView.Properties.AddProperty(typeof(AvaloniaDesigner), this);
-
-            if (_editor.TextView.TextBuffer is ITextBuffer2 newBuffer)
-            {
-                newBuffer.ChangedOnBackground += TextChanged;
-            }
         }
 
         private async Task LoadTargetsAndStartProcessAsync()
@@ -410,7 +229,7 @@ namespace AvaloniaVS.Views
                             || string.Equals(output.TargetPlatformIdentifier, "macos", StringComparison.OrdinalIgnoreCase));
                 }
 
-                string GetXamlAssembly(ProjectOutputInfo output)
+                string GetTargetAssembly(ProjectOutputInfo output)
                 {
                     var project = projects.FirstOrDefault(x => x.Project == _project);
 
@@ -435,13 +254,15 @@ namespace AvaloniaVS.Views
                            {
                                Name = $"{project.Name} [{output.TargetFramework}]",
                                ExecutableAssembly = output.TargetAssembly,
-                               XamlAssembly = GetXamlAssembly(output),
+                               TargetAssembly = GetTargetAssembly(output),
+                               RootViewTypeName = GetRootViewTypeName(),
                                HostApp = output.HostApp,
                                Project = project.Project,
                                IsNetFramework = output.IsNetFramework
                            }).ToList();
 
                 SelectedTarget = Targets.FirstOrDefault(t => t.Name == oldSelectedTarget?.Name) ?? Targets.FirstOrDefault();
+                previewer.SelectedProject = SelectedTarget?.Project;
             }
             finally
             {
@@ -531,15 +352,14 @@ namespace AvaloniaVS.Views
 
             ShowPreview();
 
-            var assemblyPath = SelectedTarget?.XamlAssembly;
+            var assemblyPath = SelectedTarget?.TargetAssembly;
             var executablePath = SelectedTarget?.ExecutableAssembly;
             var hostAppPath = SelectedTarget?.HostApp;
             var isNetFx = SelectedTarget?.IsNetFramework;
+            var rootViewTypeName = SelectedTarget?.RootViewTypeName ?? GetRootViewTypeName();
 
             if (assemblyPath != null && executablePath != null && hostAppPath != null && isNetFx != null)
             {
-                RebuildMetadata(assemblyPath, executablePath);
-
                 try
                 {
                     await _startingProcess.WaitAsync();
@@ -547,8 +367,7 @@ namespace AvaloniaVS.Views
                     if (!IsPaused)
                     {
                         await Process.SetScalingAsync(VisualTreeHelper.GetDpi(this).DpiScaleX * _scaling);
-                        await Process.StartAsync(assemblyPath, executablePath, hostAppPath, (bool)isNetFx);
-                        await Process.UpdateXamlAsync(await ReadAllTextAsync(_xamlPath));
+                        await Process.StartAsync(assemblyPath, executablePath, hostAppPath, rootViewTypeName, (bool)isNetFx);
                     }
                 }
                 catch (ApplicationException ex)
@@ -585,112 +404,6 @@ namespace AvaloniaVS.Views
             }
 
             Log.Logger.Verbose("Finished AvaloniaDesigner.StartProcessAsync()");
-        }
-
-        private string GetReferencesFilePath(IVsBuildPropertyStorage storage)
-        {
-            // .NET 8 SDK Artifacts output layout
-            // https://learn.microsoft.com/en-us/dotnet/core/sdk/artifacts-output
-            // Example
-            // MSBuildProjectDirectory: X:\abcd\src\Mobius.Windows\
-            // IntermediateOutputPath: X:\abcd\src\artifacts\obj\Mobius.Windows\debug_net8.0-windows10.0.19041.0
-
-            var intermediateOutputPath = GetMSBuildProperty("IntermediateOutputPath", storage);
-            if (Path.IsPathRooted(intermediateOutputPath))
-            {
-                return Path.Combine(intermediateOutputPath, "Avalonia", "references");
-            }
-            else
-            {
-                var projDir = GetMSBuildProperty("MSBuildProjectDirectory", storage);
-                return Path.Combine(projDir, intermediateOutputPath.TrimStart(Path.DirectorySeparatorChar), "Avalonia", "references");
-            }
-        }
-
-        private void RebuildMetadata(string assemblyPath, string executablePath)
-        {
-            
-            assemblyPath ??= SelectedTarget?.XamlAssembly;
-            var project = SelectedTarget?.Project;
-
-            if (assemblyPath != null && project != null)
-            {
-                var buffer = _editor.TextView.TextBuffer;
-                var metadata = buffer.Properties.GetOrCreateSingletonProperty(
-                    typeof(XamlBufferMetadata),
-                    () => new XamlBufferMetadata());
-                buffer.Properties["AssemblyName"] = Path.GetFileNameWithoutExtension(assemblyPath);
-
-                if (metadata.CompletionMetadata == null || metadata.NeedInvalidation)
-                {
-                    Func<IAssemblyProvider> assemblyProviderFunc = () =>
-                    {
-                        if (VsProjectAssembliesProvider.TryCreate(project, assemblyPath) is { } vsProjectAsmProvider)
-                        {
-                            return vsProjectAsmProvider;
-                        }
-                        else if (GetReferencesFilePath(GetMSBuildPropertyStorage(project)) is { } referencesPath
-                            && File.Exists(referencesPath))
-                        {
-                            return new ReferenceFileAssemblyProvider(referencesPath, assemblyPath);
-                        }
-                        return new DepsJsonFileAssemblyProvider(executablePath, assemblyPath);
-                    };
-
-                    CreateCompletionMetadataAsync(executablePath, assemblyProviderFunc, metadata).FireAndForget();
-                }
-            }
-        }
-
-        private static Dictionary<string, Task<Metadata>> _metadataCache;
-        private static readonly MetadataReader _metadataReader = new(new DnlibMetadataProvider());
-
-        private static async Task CreateCompletionMetadataAsync(
-            string executablePath,
-            Func<IAssemblyProvider> assemblyProviderFunc,
-            XamlBufferMetadata target)
-        {
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            if (_metadataCache == null)
-            {
-                _metadataCache = new Dictionary<string, Task<Metadata>>();
-                var dte = (DTE)Package.GetGlobalService(typeof(DTE));
-
-                dte.Events.BuildEvents.OnBuildBegin += (s, e) => _metadataCache.Clear();
-            }
-
-            Log.Logger.Information("Started AvaloniaDesigner.CreateCompletionMetadataAsync() for {ExecutablePath}", executablePath);
-
-            try
-            {
-                var sw = Stopwatch.StartNew();
-
-                Task<Metadata> metadataLoad;
-
-                if (!_metadataCache.TryGetValue(executablePath, out metadataLoad))
-                {
-                    var assemblyProvider = assemblyProviderFunc();
-                    metadataLoad = Task.Run(() => _metadataReader.GetForTargetAssembly(assemblyProvider));
-                    _metadataCache[executablePath] = metadataLoad;
-                }
-
-                target.CompletionMetadata = await metadataLoad;
-
-                target.NeedInvalidation = false;
-
-                sw.Stop();
-
-                Log.Logger.Verbose("Finished AvaloniaDesigner.CreateCompletionMetadataAsync() took {Time} for {ExecutablePath}", sw.Elapsed, executablePath);
-            }
-            catch (Exception ex)
-            {
-                Log.Logger.Error(ex, "Error creating XAML completion metadata");
-            }
-            finally
-            {
-                Log.Logger.Verbose("Finished AvaloniaDesigner.CreateCompletionMetadataAsync()");
-            }
         }
 
         private async void ErrorChanged(object sender, EventArgs e)
@@ -762,80 +475,6 @@ namespace AvaloniaVS.Views
             errorIndicator.Visibility = Visibility.Collapsed;
         }
 
-        private void TextChanged(object sender, TextContentChangedEventArgs e)
-        {
-            _throttle.Queue(e.After.GetText());
-        }
-
-        private void UpdateLayoutForView()
-        {
-            void HorizontalGrid()
-            {
-                if (mainGrid.RowDefinitions.Count == 0)
-                {
-                    mainGrid.RowDefinitions.Add(previewRow);
-                    mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    mainGrid.RowDefinitions.Add(codeRow);
-                    mainGrid.ColumnDefinitions.Clear();
-                    splitter.Height = 5;
-                    splitter.Width = double.NaN;
-                }
-            }
-
-            void VerticalGrid()
-            {
-                if (mainGrid.ColumnDefinitions.Count == 0)
-                {
-                    mainGrid.ColumnDefinitions.Add(_previewCol);
-                    mainGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                    mainGrid.ColumnDefinitions.Add(_codeCol);
-                    mainGrid.RowDefinitions.Clear();
-                    splitter.Width = 5;
-                    splitter.Height = double.NaN;
-                }
-            }
-
-            if (View == AvaloniaDesignerView.Split)
-            {
-                previewRow.Height = OneStar;
-                codeRow.Height = OneStar;
-
-                if (SplitOrientation == Orientation.Horizontal)
-                {
-                    HorizontalGrid();
-                    var content = SwapPanesButton.Content as UIElement;
-                    content.RenderTransform = new RotateTransform(90);
-                }
-                else
-                {
-                    VerticalGrid();
-                    var content = SwapPanesButton.Content as UIElement;
-                    content.RenderTransform = null;
-                }
-
-                splitter.Visibility = Visibility.Visible;
-                SwapPanesButton.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                HorizontalGrid();
-                previewRow.Height = View == AvaloniaDesignerView.Design ? OneStar : ZeroStar;
-                codeRow.Height = View == AvaloniaDesignerView.Source ? OneStar : ZeroStar;
-                splitter.Visibility = Visibility.Collapsed;
-                SwapPanesButton.Visibility = Visibility.Collapsed;
-            }
-        }
-
-        private void SwapPreviewAndXamlPanes(object sender, RoutedEventArgs args) => PreviewAndXamlPanesSwapped = !PreviewAndXamlPanesSwapped;
-
-        private void UpdateXaml(string xaml)
-        {
-            if (Process.IsReady)
-            {
-                Process.UpdateXamlAsync(xaml).FireAndForget();
-            }
-        }
-
         private void UpdateScaling(double scaling)
         {
             _scaling = scaling;
@@ -879,23 +518,8 @@ namespace AvaloniaVS.Views
         {
             if (d is AvaloniaDesigner designer && !designer._loadingTargets)
             {
+                designer.previewer.SelectedProject = (e.NewValue as DesignerRunTarget)?.Project;
                 designer.SelectedTargetChangedAsync(d, e).FireAndForget();
-            }
-        }
-
-        private static void HandleSplitOrientationChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            if (d is AvaloniaDesigner designer)
-            {
-                designer.UpdateLayoutForView();
-            }
-        }
-
-        private static void HandleViewChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            if (d is AvaloniaDesigner designer)
-            {
-                designer.UpdateLayoutForView();
             }
         }
 
@@ -913,6 +537,24 @@ namespace AvaloniaVS.Views
             {
                 return await reader.ReadToEndAsync();
             }
+        }
+
+        private string GetRootViewTypeName()
+        {
+            if (string.IsNullOrWhiteSpace(_currentFileName) || !File.Exists(_currentFileName))
+            {
+                return null;
+            }
+
+            var sourceText = ReadAllTextAsync(_currentFileName).GetAwaiter().GetResult();
+            var match = Regex.Match(sourceText, @"\bclass\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\b");
+
+            if (match.Success)
+            {
+                return match.Groups["name"].Value;
+            }
+
+            return Path.GetFileNameWithoutExtension(_currentFileName);
         }
 
         private IVsBuildPropertyStorage GetMSBuildPropertyStorage(Project project)

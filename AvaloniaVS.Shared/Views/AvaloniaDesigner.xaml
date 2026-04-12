@@ -81,69 +81,11 @@
                 <TextBlock Text="!" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" FontWeight="ExtraBold" />
             </Grid>
 
-            <ListBox SelectedIndex="{Binding View, ElementName=root, Mode=TwoWay, Converter={StaticResource EnumToInt}}">
-                <ListBoxItem ToolTip="Split View">
-                    <imaging:CrispImage Moniker="{x:Static catalog:KnownMonikers.Splitter}"/>
-                </ListBoxItem>
-                <ListBoxItem ToolTip="Design View">
-                    <imaging:CrispImage Moniker="{x:Static catalog:KnownMonikers.HTMLDesignView}"/>
-                </ListBoxItem>
-                <ListBoxItem ToolTip="XAML View">
-                    <imaging:CrispImage Moniker="{x:Static catalog:KnownMonikers.MarkupTag}"/>
-                </ListBoxItem>
-            </ListBox>
-
-            <ListBox SelectedIndex="{Binding SplitOrientation, ElementName=root, Mode=TwoWay, Converter={StaticResource EnumToInt}}">
-                <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBoxItem ToolTip="Horizontal Layout">
-                    <imaging:CrispImage Moniker="{x:Static catalog:KnownMonikers.SplitScreenHorizontally}"/>
-                </ListBoxItem>
-                <ListBoxItem ToolTip="Vertical Layout">
-                    <imaging:CrispImage Moniker="{x:Static catalog:KnownMonikers.SplitScreenVertically}"/>
-                </ListBoxItem>
-            </ListBox>
-
-            <Button VerticalAlignment="Center"
-                    DockPanel.Dock="Right"
-                    local:VsTheme.UseVsTheme="True"
-                    MinWidth="0" MinHeight="0"
-                    Padding="2" Margin="0 0 10 0"
-                    ToolTip="Swap Preview and Xaml panes"
-                    Click="SwapPreviewAndXamlPanes"
-                    x:Name="SwapPanesButton">
-                <imaging:CrispImage Moniker="{x:Static catalog:KnownMonikers.SwitchSourceOrTarget}" 
-                                    RenderTransformOrigin="0.5,0.5" />
-            </Button>
-
             <Control/>
         </DockPanel>
 
         <Grid x:Name="mainGrid" UseLayoutRounding="True">
-            <Grid.RowDefinitions>
-                <RowDefinition x:Name="previewRow"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition x:Name="codeRow"/>
-            </Grid.RowDefinitions>
-
-            <views:GridLines Grid.ColumnSpan="3"
-                             Grid.RowSpan="3"
-                             Margin="0,0,0,5" />
-
-      <local:AvaloniaPreviewer x:Name="previewer" Grid.Column="2" SizeChanged="Preview_SizeChanged" />
-
-            <GridSplitter x:Name="splitter"
-                          Grid.Row="1"
-                          Grid.Column="1"
-                          VerticalAlignment="Stretch"
-                          HorizontalAlignment="Stretch"
-                          Height="5"
-                          Background="{DynamicResource VsBrush.PanelSeparator}"/>
-
-            <Decorator Grid.Row="2" Grid.Column="0" Name="editorHost"/>
+            <local:AvaloniaPreviewer x:Name="previewer" SizeChanged="Preview_SizeChanged" />
         </Grid>
     </DockPanel>
 

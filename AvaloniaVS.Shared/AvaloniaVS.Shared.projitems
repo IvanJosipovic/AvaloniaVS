@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
@@ -15,23 +15,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Converters\NotNullOrEmptyToVisibilityConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Constants.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)EnumerableExtesions.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\CompletionEngineSource.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\TextChangeAdapter.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlCompletion.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlCompletionCommandHandler.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlCompletionHandlerProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlCompletionSource.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlCompletionSourceProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlErrorTableEntry.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlErrorTagger.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlErrorTaggerProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)intellisense\XamlPasteCommandHandler.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlTextManipulatorRegistrar.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IntelliSense\XamlTextViewCreationListener.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\DesignerRunTarget.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ProjectInfo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ProjectOutputInfo.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Models\XamlBufferMetadata.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ProjectSystem\AvaloniaProject.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ServiceProviderExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\AnalyticsService.cs" />
@@ -43,14 +29,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\PreviewerProcess.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\SolutionService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\Throttle.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Services\VsProjectAssembliesProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)SuggestedActions\Actions\Base\BaseSuggestedAction.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)SuggestedActions\Actions\MissingAliasSuggestedAction.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)SuggestedActions\Actions\MissingNamespaceAndAliasSuggestedAction.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)SuggestedActions\Actions\MissingNamespaceSuggestedAction.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)SuggestedActions\Helpers\PreviewProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)SuggestedActions\SuggestedActionsSource.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)SuggestedActions\SuggestedActionsSourceProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TaskExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TextViewExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\FrameworkInfoUtils.cs" />
@@ -66,7 +44,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Views\OptionsView.xaml.cs">
       <DependentUpon>OptionsView.xaml</DependentUpon>
     </Compile>
-    <Compile Include="$(MSBuildThisFileDirectory)Views\TextEditorHost.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Views\VsTheme.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ZoomLevels.cs" />
   </ItemGroup>
@@ -78,9 +55,6 @@
     <Content Include="$(MSBuildThisFileDirectory)Resources\AvaloniaPackage.ico" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="$(MSBuildThisFileDirectory)icons.pkgdef">
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
     <None Include="$(MSBuildThisFileDirectory)Key.snk">
       <Link>Key.snk</Link>
     </None>

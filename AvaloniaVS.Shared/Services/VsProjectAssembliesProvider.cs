@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using Avalonia.Ide.CompletionEngine.AssemblyMetadata;
 using Microsoft.VisualStudio.Shell;
 using Serilog;
 using VSLangProj;
@@ -9,7 +8,7 @@ using VSLangProj;
 namespace AvaloniaVS.Shared.Services
 {
     // VS API requires this code to run on Main Thread, so we have to fetch that ahead.
-    internal class VsProjectAssembliesProvider : IAssemblyProvider
+    internal class VsProjectAssembliesProvider
     {
         private readonly List<string> _references;
 
@@ -18,7 +17,7 @@ namespace AvaloniaVS.Shared.Services
             _references = references;
         }
 
-        public static VsProjectAssembliesProvider TryCreate(EnvDTE.Project project, string xamlPrimaryAssemblyPath)
+        public static VsProjectAssembliesProvider TryCreate(EnvDTE.Project project, string targetAssemblyPath)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
@@ -27,7 +26,7 @@ namespace AvaloniaVS.Shared.Services
                 if (project.Object is VSProject vsProject)
                 {
                     var references = new List<string>(200);
-                    references.Add(xamlPrimaryAssemblyPath);
+                    references.Add(targetAssemblyPath);
 
                     foreach (Reference reference in vsProject.References)
                     {

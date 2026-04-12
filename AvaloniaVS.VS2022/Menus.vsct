@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidAvaloniaDeclarativePreviewPkg">
+    <Groups>
+      <Group guid="guidAvaloniaDeclarativePreviewCmdSet" id="AvaloniaCommandsGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS" />
+      </Group>
+
+      <Group guid="guidAvaloniaDeclarativePreviewCmdSet" id="AvaloniaPreviewContextMenuGroup" priority="0x0600" />
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidAvaloniaDeclarativePreviewCmdSet" id="OpenPreviewCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidAvaloniaDeclarativePreviewCmdSet" id="AvaloniaPreviewContextMenuGroup" />
+        <CommandFlag>DefaultInvisible</CommandFlag>
+        <CommandFlag>DynamicVisibility</CommandFlag>
+        <Strings>
+          <ButtonText>Open in Avalonia Declarative Preview</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <CommandPlacements>
+    <CommandPlacement guid="guidAvaloniaDeclarativePreviewCmdSet" id="OpenPreviewCommandId" priority="0x0100">
+      <Parent guid="guidAvaloniaDeclarativePreviewCmdSet" id="AvaloniaCommandsGroup" />
+    </CommandPlacement>
+    <CommandPlacement guid="guidAvaloniaDeclarativePreviewCmdSet" id="AvaloniaPreviewContextMenuGroup" priority="0x0100">
+      <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_CODEWIN" />
+    </CommandPlacement>
+    <CommandPlacement guid="guidAvaloniaDeclarativePreviewCmdSet" id="AvaloniaPreviewContextMenuGroup" priority="0x0100">
+      <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE" />
+    </CommandPlacement>
+  </CommandPlacements>
+
+  <Symbols>
+    <GuidSymbol name="guidAvaloniaDeclarativePreviewPkg" value="{06a821f3-7a9f-4668-a6c5-037eba297c4c}" />
+    <GuidSymbol name="guidAvaloniaDeclarativePreviewCmdSet" value="{9d4f5c4a-6d55-4ca2-9b7b-9c8db5c3f2e1}">
+      <IDSymbol name="AvaloniaCommandsGroup" value="0x1020" />
+      <IDSymbol name="AvaloniaPreviewContextMenuGroup" value="0x1021" />
+      <IDSymbol name="OpenPreviewCommandId" value="0x0100" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

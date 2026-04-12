@@ -19,9 +19,14 @@ namespace AvaloniaVS.Models
         public string ExecutableAssembly { get; set; }
 
         /// <summary>
-        /// Gets or sets the full path to the assembly containing the XAML.
+        /// Gets or sets the full path to the preview target assembly.
         /// </summary>
-        public string XamlAssembly { get; set; }
+        public string TargetAssembly { get; set; }
+
+        /// <summary>
+        /// Gets or sets the root view type name to activate in the preview host.
+        /// </summary>
+        public string RootViewTypeName { get; set; }
 
         public Project Project { get; set; }
 

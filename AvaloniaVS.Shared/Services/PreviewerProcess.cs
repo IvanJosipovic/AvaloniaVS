@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Xaml;
 using Avalonia.Remote.Protocol;
 using Avalonia.Remote.Protocol.Designer;
 using Avalonia.Remote.Protocol.Input;
@@ -21,7 +20,7 @@ using Task = System.Threading.Tasks.Task;
 namespace AvaloniaVS.Services
 {
     /// <summary>
-    /// Manages running a XAML previewer process.
+    /// Manages running the previewer process.
     /// </summary>
     public class PreviewerProcess : IDisposable, ILogEventEnricher
     {
@@ -102,7 +101,7 @@ namespace AvaloniaVS.Services
         /// <summary>
         /// Starts the previewer process.
         /// </summary>
-        /// <param name="assemblyPath">The path to the assembly containing the XAML.</param>
+        /// <param name="assemblyPath">The path to the preview target assembly.</param>
         /// <param name="executablePath">The path to the executable to use for the preview.</param>
         /// <param name="hostAppPath">The path to the host application.</param>
         /// <returns>A task tracking the startup operation.</returns>
@@ -110,6 +109,7 @@ namespace AvaloniaVS.Services
             string assemblyPath,
             string executablePath,
             string hostAppPath,
+            string rootViewTypeName,
             bool isNetFx)
         {
             _log.Verbose("Started PreviewerProcess.StartAsync()");
@@ -200,6 +200,10 @@ namespace AvaloniaVS.Services
                 EnsureExists(runtimeConfigPath);
                 EnsureExists(depsPath);
                 args = $@"exec --runtimeconfig ""{runtimeConfigPath}"" --depsfile ""{depsPath}"" ""{hostAppPath}"" --transport tcp-bson://127.0.0.1:{port}/ ""{_executablePath}""";
+                if (!string.IsNullOrWhiteSpace(rootViewTypeName))
+                {
+                    args += $@" --root-view-type ""{rootViewTypeName}""";
+                }
                 processInfo = new ProcessStartInfo
                 {
                     Arguments = args,
@@ -213,6 +217,10 @@ namespace AvaloniaVS.Services
             else
             {
                 args = $@"--transport tcp-bson://127.0.0.1:{port}/ ""{_executablePath}""";
+                if (!string.IsNullOrWhiteSpace(rootViewTypeName))
+                {
+                    args += $@" --root-view-type ""{rootViewTypeName}""";
+                }
                 processInfo = new ProcessStartInfo
                 {
                     Arguments = args,
@@ -315,30 +323,6 @@ namespace AvaloniaVS.Services
                     });
                 }
             }
-        }
-
-        /// <summary>
-        /// Updates the XAML to be previewed.
-        /// </summary>
-        /// <param name="xaml">The XAML.</param>
-        /// <returns>A task tracking the operation.</returns>
-        public async Task UpdateXamlAsync(string xaml)
-        {
-            if (_process == null)
-            {
-                throw new InvalidOperationException("Process not started.");
-            }
-
-            if (_connection == null)
-            {
-                throw new InvalidOperationException("Process not finished initializing.");
-            }
-
-            await SendAsync(new UpdateXamlMessage
-            {
-                AssemblyPath = _assemblyPath,
-                Xaml = xaml,
-            });
         }
 
         /// <summary>
@@ -447,28 +431,6 @@ namespace AvaloniaVS.Services
                         {
                             SequenceId = frame.SequenceId
                         });
-                        break;
-                    }
-                case UpdateXamlResultMessage update:
-                    {
-                        var exception = update.Exception;
-
-                        if (exception == null && !string.IsNullOrWhiteSpace(update.Error))
-                        {
-                            exception = new ExceptionDetails { Message = update.Error };
-                        }
-
-                        Error = exception;
-
-                        if (exception != null)
-                        {
-                            _log.Error(new XamlException(exception.Message, null, exception.LineNumber ?? 0, exception.LinePosition ?? 0), "UpdateXamlResult error");
-                            if (!string.IsNullOrWhiteSpace(update.Error))
-                            {
-                                _log.Error("UpdateXamlResult error details: {0}", update.Error);
-                            }
-                        }
-
                         break;
                     }
             }
